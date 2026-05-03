@@ -5,6 +5,8 @@ from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
+from arq import create_pool
+
 from database import db, settings
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -41,20 +43,35 @@ async def receive_github_webhook(
     repo = payload.get("repository", {}).get("full_name")
     sender = payload.get("sender", {}).get("login")
 
-    row = await db.execute(
-        """
-        INSERT INTO webhook_events (event_type, action, repo, sender, payload)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id
-        """,
-        x_github_event,
-        action,
-        repo,
-        sender,
-        json.dumps(payload),
+    await db.execute(
+        "INSERT INTO webhook_events (event_type, action, repo, sender, payload) VALUES ($1,$2,$3,$4,$5)",
+        x_github_event, action, repo, sender, json.dumps(payload),
     )
 
-    return {"status": "accepted", "event": x_github_event, "repo": repo}
+    if x_github_event == "push" and repo:
+        #Look up projects config with this repo
+        project = await db.fetchrow("SELECT id FROM projects WHERE repo = $1", repo)
+        if project:
+            row = await db.fetchrow(
+                "INSERT INTO deployments (project_id, repo, triggered_by) VALUES ($1,$2,$3) RETURNING id",
+                project["id"], repo, sender,
+            )
+            deployment_id = row["id"]
+
+            redis = await create_pool(settings.arq_redis_settings)
+            await redis.enqueue_job(
+                "run_deploy",
+                deployment_id=deployment_id,
+                host=project["deploy_host"],
+                user=project["deployuser"],
+                workdir=project["deploy_workdir"],
+                _job_id=f"deploy:{repo}:{deployment_id}",  # dedupe key
+            )
+
+            await redis.close()
+
+            return {"status":"accepted","event": x_github_event, "deployment_id": deployment_id}
+    return {"status": "accepted", "event": x_github_event, "queued":"False"}
 
 
 @router.get("/github")
