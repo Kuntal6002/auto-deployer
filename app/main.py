@@ -10,7 +10,6 @@ from prometheus_fastapi_instrumentator import Instrumentator
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.connect()
-    Instrumentator().instrument(app).expose(app)
     yield
     await db.disconnect()
 
@@ -21,6 +20,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+Instrumentator().instrument(app).expose(app)
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
