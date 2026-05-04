@@ -20,10 +20,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 app.include_router(webhooks_router)
 app.include_router(deployments_router)
 @app.get("/health")
 async def health_check():
     return {"status":"ok"}
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
