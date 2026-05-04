@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Railway</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg-2: #111111;
+    --bg-3: #1a1a1a;
+    --border: #2a2a2a;
+    --border-bright: #3a3a3a;
+    --text: #e8e8e8;
+    --text-dim: #666;
+    --text-muted: #444;
+    --green: #00ff88;
+    --green-dim: #00ff8822;
+    --yellow: #ffcc00;
+    --yellow-dim: #ffcc0022;
+    --red: #ff4444;
+    --red-dim: #ff444422;
+    --blue: #4488ff;
+    --blue-dim: #4488ff22;
+    --orange: #ff8844;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline effect */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Noise texture */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    opacity: 0.02;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* Header */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    animation: pulse-border 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { border-color: var(--green); box-shadow: 0 0 0 0 var(--green-dim); }
+    50% { border-color: var(--green); box-shadow: 0 0 0 4px var(--green-dim); }
+  }
+
+  .logo-icon::before {
+    content: '▲';
+    font-size: 10px;
+    color: var(--green);
+  }
+
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .logo-sub {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .btn {
+    background: transparent;
+    border: 1px solid var(--border-bright);
+    color: var(--text-dim);
+    padding: 6px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .btn:hover {
+    border-color: var(--green);
+    color: var(--green);
+    background: var(--green-dim);
+  }
+
+  .btn-primary {
+    border-color: var(--green);
+    color: var(--green);
+    background: var(--green-dim);
+  }
+
+  .btn-primary:hover {
+    background: rgba(0,255,136,0.15);
+  }
+
+  /* Layout */
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  /* Stats row */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    margin-bottom: 2rem;
+    animation: fadeInUp 0.4s ease both;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .stat-card {
+    background: var(--bg-2);
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .stat-card:hover::before { opacity: 1; }
+
+  .stat-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+  }
+
+  .stat-value {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 2.2rem;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-value.green { color: var(--green); }
+  .stat-value.yellow { color: var(--yellow); }
+  .stat-value.red { color: var(--red); }
+  .stat-value.blue { color: var(--blue); }
+
+  .stat-delta {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+  }
+
+  /* Main grid */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 2rem;
+  }
+
+  /* Panel */
+  .panel {
+    border: 1px solid var(--border);
+    background: var(--bg-2);
+    animation: fadeInUp 0.4s ease both;
+  }
+
+  .panel:nth-child(2) { animation-delay: 0.05s; }
+  .panel:nth-child(3) { animation-delay: 0.1s; }
+
+  .panel-header {
+    border-bottom: 1px solid var(--border);
+    padding: 0.875rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .panel-title {
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .panel-title span {
+    color: var(--text-muted);
+    margin-left: 6px;
+  }
+
+  /* Deployments table */
+  .deployments-list {
+    divide: 1px solid var(--border);
+  }
+
+  .deployment-row {
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 1.25rem;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto auto;
+    gap: 1rem;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+  }
+
+  .deployment-row:last-child { border-bottom: none; }
+  .deployment-row:hover { background: var(--bg-3); }
+
+  .deployment-row.active {
+    background: var(--bg-3);
+  }
+
+  .deployment-row.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--green);
+  }
+
+  .deploy-id {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    min-width: 32px;
+  }
+
+  .deploy-repo {
+    font-size: 0.8rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .deploy-repo small {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .deploy-duration {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .deploy-trigger {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .badge {
+    font-size: 0.6rem;
+    padding: 3px 8px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+
+  .badge-success { color: var(--green); border-color: var(--green); background: var(--green-dim); }
+  .badge-running { color: var(--yellow); border-color: var(--yellow); background: var(--yellow-dim); }
+  .badge-failed { color: var(--red); border-color: var(--red); background: var(--red-dim); }
+  .badge-queued { color: var(--blue); border-color: var(--blue); background: var(--blue-dim); }
+
+  .badge-running .dot-inline {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--yellow);
+    margin-right: 4px;
+    animation: blink 1s ease-in-out infinite;
+  }
+
+  /* Log panel */
+  .log-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .log-header {
+    border-bottom: 1px solid var(--border);
+    padding: 0.875rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .log-body {
+    flex: 1;
+    padding: 1rem 1.25rem;
+    font-size: 0.72rem;
+    line-height: 1.8;
+    color: var(--text-dim);
+    overflow-y: auto;
+    min-height: 300px;
+    max-height: 400px;
+  }
+
+  .log-line {
+    display: flex;
+    gap: 1rem;
+    animation: logAppear 0.2s ease both;
+  }
+
+  @keyframes logAppear {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .log-seq {
+    color: var(--text-muted);
+    min-width: 24px;
+    user-select: none;
+  }
+
+  .log-text { color: var(--text); }
+  .log-text.success { color: var(--green); }
+  .log-text.error { color: var(--red); }
+
+  /* Activity feed */
+  .activity-item {
+    border-bottom: 1px solid var(--border);
+    padding: 0.875rem 1.25rem;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    animation: fadeInUp 0.3s ease both;
+  }
+
+  .activity-item:last-child { border-bottom: none; }
+
+  .activity-icon {
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border-bright);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .activity-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .activity-text {
+    font-size: 0.75rem;
+    color: var(--text);
+    line-height: 1.4;
+  }
+
+  .activity-time {
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+
+  /* Terminal prompt */
+  .terminal-prompt {
+    border-top: 1px solid var(--border);
+    padding: 0.875rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .prompt-symbol {
+    color: var(--green);
+    font-size: 0.8rem;
+    user-select: none;
+  }
+
+  .prompt-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    outline: none;
+    caret-color: var(--green);
+  }
+
+  .prompt-input::placeholder { color: var(--text-muted); }
+
+  /* Bottom row */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+
+  /* Server health */
+  .health-item {
+    border-bottom: 1px solid var(--border);
+    padding: 0.875rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .health-item:last-child { border-bottom: none; }
+
+  .health-label {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .health-value {
+    font-size: 0.72rem;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bar-track {
+    width: 80px;
+    height: 3px;
+    background: var(--border-bright);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: var(--green);
+    transition: width 1s ease;
+  }
+
+  .bar-fill.warn { background: var(--yellow); }
+  .bar-fill.danger { background: var(--red); }
+
+  /* Deploy form */
+  .deploy-form {
+    padding: 1.25rem;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  .form-input {
+    width: 100%;
+    background: var(--bg-3);
+    border: 1px solid var(--border-bright);
+    color: var(--text);
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .form-input:focus { border-color: var(--green); }
+
+  .deploy-btn {
+    width: 100%;
+    background: var(--green-dim);
+    border: 1px solid var(--green);
+    color: var(--green);
+    padding: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .deploy-btn:hover {
+    background: rgba(0,255,136,0.2);
+  }
+
+  .deploy-btn:active { transform: scale(0.99); }
+
+  /* Cursor blink */
+  .cursor {
+    display: inline-block;
+    width: 7px;
+    height: 14px;
+    background: var(--green);
+    animation: cursorBlink 1s step-end infinite;
+    vertical-align: middle;
+    margin-left: 2px;
+  }
+
+  @keyframes cursorBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* Empty state */
+  .empty-state {
+    padding: 3rem 1.25rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    line-height: 2;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  /* Responsive */
+  @media (max-width: 1100px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .bottom-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon"></div>
+    <div>
+      <div class="logo-text">Mini Railway</div>
+      <div class="logo-sub">Self-hosted deploy platform</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill">
+      <div class="dot"></div>
+      <span>SYSTEM ONLINE</span>
+    </div>
+    <div class="status-pill">OnePlus 5T · 100.101.185.39</div>
+    <button class="btn btn-primary" onclick="triggerDeploy()">▲ Deploy</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Deployments</div>
+      <div class="stat-value blue" id="stat-total">0</div>
+      <div class="stat-delta">all time</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Successful</div>
+      <div class="stat-value green" id="stat-success">0</div>
+      <div class="stat-delta">deployments</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Failed</div>
+      <div class="stat-value red" id="stat-failed">0</div>
+      <div class="stat-delta">deployments</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Running</div>
+      <div class="stat-value yellow" id="stat-running">0</div>
+      <div class="stat-delta">in progress</div>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="main-grid">
+
+    <!-- Deployments -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Deployments <span id="deploy-count"></span></div>
+        <button class="btn" onclick="loadDeployments()">↻ Refresh</button>
+      </div>
+      <div id="deployments-list">
+        <div class="empty-state">
+          No deployments yet.<br>
+          Push to GitHub or trigger manually.<span class="cursor"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div style="display: flex; flex-direction: column; gap: 2rem;">
+
+      <!-- Deploy form -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Manual Deploy</div>
+        </div>
+        <div class="deploy-form">
+          <div class="form-group">
+            <label class="form-label">Repository</label>
+            <input class="form-input" id="deploy-repo" placeholder="user/repo" value="Kuntal6002/auto-deployer">
+          </div>
+          <button class="deploy-btn" onclick="manualDeploy()">
+            <span>▲</span> Trigger Deploy
+          </button>
+        </div>
+      </div>
+
+      <!-- Activity -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Activity</div>
+        </div>
+        <div id="activity-feed">
+          <div class="activity-item">
+            <div class="activity-icon" style="color: var(--green); border-color: var(--green)">●</div>
+            <div class="activity-content">
+              <div class="activity-text">System started. Waiting for webhooks.</div>
+              <div class="activity-time">just now</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Log viewer -->
+  <div class="panel" style="margin-top: 2rem;" id="log-panel" style="display:none">
+    <div class="log-header">
+      <div class="panel-title">Deploy Logs <span id="log-deployment-id"></span></div>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <span id="log-status-badge"></span>
+        <button class="btn" onclick="document.getElementById('log-panel').style.display='none'">✕ Close</button>
+      </div>
+    </div>
+    <div class="log-body" id="log-body">
+      <div style="color: var(--text-muted); font-size: 0.72rem;">Select a deployment to view logs.</div>
+    </div>
+    <div class="terminal-prompt">
+      <span class="prompt-symbol">$</span>
+      <input class="prompt-input" placeholder="mini-railway ~" readonly>
+      <span class="cursor"></span>
+    </div>
+  </div>
+
+  <!-- Bottom grid -->
+  <div class="bottom-grid">
+
+    <!-- Server health -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Server Health</div>
+        <div class="status-pill"><div class="dot"></div><span>LIVE</span></div>
+      </div>
+      <div class="health-item">
+        <div class="health-label">● API Server</div>
+        <div class="health-value"><span style="color: var(--green)">ONLINE</span></div>
+      </div>
+      <div class="health-item">
+        <div class="health-label">● Redis Queue</div>
+        <div class="health-value"><span style="color: var(--green)">CONNECTED</span></div>
+      </div>
+      <div class="health-item">
+        <div class="health-label">● PostgreSQL</div>
+        <div class="health-value"><span style="color: var(--green)">HEALTHY</span></div>
+      </div>
+      <div class="health-item">
+        <div class="health-label">● arq Worker</div>
+        <div class="health-value"><span style="color: var(--green)">RUNNING</span></div>
+      </div>
+      <div class="health-item">
+        <div class="health-label">● OnePlus 5T</div>
+        <div class="health-value">
+          <div class="bar-track"><div class="bar-fill" style="width: 19%"></div></div>
+          <span>19% RAM</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Projects -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Projects</div>
+        <button class="btn">+ Add</button>
+      </div>
+      <div id="projects-list">
+        <div class="health-item">
+          <div class="health-label">
+            <span style="color: var(--green)">▲</span>
+            Kuntal6002/auto-deployer
+          </div>
+          <div class="health-value">
+            <span class="badge badge-success">active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  const API = 'http://localhost:8000';
+
+  // Load deployments from API
+  async function loadDeployments() {
+    try {
+      const res = await fetch(`${API}/deployments?limit=20`);
+      const deployments = await res.json();
+      renderDeployments(deployments);
+      updateStats(deployments);
+    } catch (e) {
+      console.error('Failed to load deployments:', e);
+    }
+  }
+
+  function renderDeployments(deployments) {
+    const list = document.getElementById('deployments-list');
+    document.getElementById('deploy-count').textContent = `(${deployments.length})`;
+
+    if (deployments.length === 0) {
+      list.innerHTML = `<div class="empty-state">No deployments yet.<br>Push to GitHub or trigger manually.<span class="cursor"></span></div>`;
+      return;
+    }
+
+    list.innerHTML = deployments.map(d => `
+      <div class="deployment-row" onclick="viewLogs(${d.id})">
+        <div class="deploy-id">#${d.id}</div>
+        <div class="deploy-repo">
+          ${d.repo}
+          <small>triggered by ${d.triggered_by || 'webhook'}</small>
+        </div>
+        <div class="deploy-duration">${formatDuration(d.started_at, d.finished_at)}</div>
+        <div class="deploy-trigger">${formatTime(d.triggered_at)}</div>
+        <div>${statusBadge(d.status)}</div>
+      </div>
+    `).join('');
+  }
+
+  function updateStats(deployments) {
+    document.getElementById('stat-total').textContent = deployments.length;
+    document.getElementById('stat-success').textContent = deployments.filter(d => d.status === 'success').length;
+    document.getElementById('stat-failed').textContent = deployments.filter(d => d.status === 'failed').length;
+    document.getElementById('stat-running').textContent = deployments.filter(d => d.status === 'running').length;
+  }
+
+  function statusBadge(status) {
+    const map = {
+      success: '<span class="badge badge-success">success</span>',
+      failed: '<span class="badge badge-failed">failed</span>',
+      running: '<span class="badge badge-running"><span class="dot-inline"></span>running</span>',
+      queued: '<span class="badge badge-queued">queued</span>',
+    };
+    return map[status] || `<span class="badge">${status}</span>`;
+  }
+
+  function formatDuration(start, end) {
+    if (!start || !end) return '—';
+    const ms = new Date(end) - new Date(start);
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
+
+  function formatTime(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    return d.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  // View logs for a deployment
+  async function viewLogs(id) {
+    const panel = document.getElementById('log-panel');
+    panel.style.display = 'block';
+    document.getElementById('log-deployment-id').textContent = `#${id}`;
+
+    // Get deployment info
+    try {
+      const res = await fetch(`${API}/deployments/${id}`);
+      const dep = await res.json();
+      document.getElementById('log-status-badge').innerHTML = statusBadge(dep.status);
+    } catch(e) {}
+
+    // Get logs
+    try {
+      const res = await fetch(`${API}/deployments/${id}/logs`);
+      const logs = await res.json();
+      renderLogs(logs);
+    } catch(e) {
+      document.getElementById('log-body').innerHTML = `<div style="color: var(--red)">Failed to load logs.</div>`;
+    }
+
+    // Scroll to log panel
+    panel.scrollIntoView({ behavior: 'smooth' });
+
+    // Highlight selected row
+    document.querySelectorAll('.deployment-row').forEach(r => r.classList.remove('active'));
+    document.querySelector(`.deployment-row[onclick="viewLogs(${id})"]`)?.classList.add('active');
+  }
+
+  function renderLogs(logs) {
+    const body = document.getElementById('log-body');
+    if (logs.length === 0) {
+      body.innerHTML = `<div style="color: var(--text-muted)">No logs yet.</div>`;
+      return;
+    }
+    body.innerHTML = logs.map((l, i) => `
+      <div class="log-line" style="animation-delay: ${i * 0.03}s">
+        <span class="log-seq">${String(l.seq).padStart(3, '0')}</span>
+        <span class="log-text ${l.line.includes('ERROR') ? 'error' : l.line.includes('Up') ? 'success' : ''}">${escapeHtml(l.line)}</span>
+      </div>
+    `).join('');
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Manual deploy trigger
+  async function manualDeploy() {
+    const repo = document.getElementById('deploy-repo').value.trim();
+    if (!repo) return;
+
+    addActivity(`Triggering deploy for ${repo}...`, '▲');
+
+    try {
+      const res = await fetch(`${API}/webhooks/github`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-GitHub-Event': 'push',
+        },
+        body: JSON.stringify({
+          repository: { full_name: repo },
+          sender: { login: 'dashboard' }
+        })
+      });
+      const data = await res.json();
+      addActivity(`Deploy queued → deployment #${data.deployment_id}`, '✓');
+      setTimeout(loadDeployments, 1000);
+      setTimeout(loadDeployments, 5000);
+      setTimeout(loadDeployments, 15000);
+    } catch(e) {
+      addActivity(`Failed to trigger deploy: ${e.message}`, '✕');
+    }
+  }
+
+  function triggerDeploy() {
+    document.getElementById('deploy-repo').focus();
+    document.querySelector('.deploy-btn').click();
+  }
+
+  function addActivity(text, icon = '●') {
+    const feed = document.getElementById('activity-feed');
+    const item = document.createElement('div');
+    item.className = 'activity-item';
+    item.innerHTML = `
+      <div class="activity-icon" style="color: var(--green); border-color: var(--green)">${icon}</div>
+      <div class="activity-content">
+        <div class="activity-text">${text}</div>
+        <div class="activity-time">${new Date().toLocaleTimeString()}</div>
+      </div>
+    `;
+    feed.insertBefore(item, feed.firstChild);
+  }
+
+  // Auto-refresh every 10 seconds
+  loadDeployments();
+  setInterval(loadDeployments, 10000);
+</script>
+
+</body>
+</html>

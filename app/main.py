@@ -4,8 +4,7 @@ from database import db
 from routers.webhooks import router as webhooks_router
 from routers.deployments import router as deployments_router
 from fastapi.middleware.cors import CORSMiddleware
-
-
+from fastapi.staticfiles import StaticFiles
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,7 +18,10 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-)app.include_router(webhooks_router)
+)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+app.include_router(webhooks_router)
 app.include_router(deployments_router)
 @app.get("/health")
 async def health_check():
