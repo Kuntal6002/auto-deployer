@@ -41,6 +41,8 @@ services:
     build: ./app
     restart: unless-stopped
     command: uv run arq worker.WorkerSettings
+    volumes:
+      - ~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379

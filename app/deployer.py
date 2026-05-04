@@ -9,7 +9,9 @@ async def _stream_ssh(host: str, user: str, command: str) -> AsyncIterator[str]:
     async with asyncssh.connect(
         host,
         username=user,
-        known_hosts=None,         # TODO: pin known_hosts in production
+        known_hosts=None,
+        client_keys=['/root/.ssh/id_ed25519'],
+         # TODO: pin known_hosts in production
     ) as conn:
         async with conn.create_process(command) as proc:
             async for line in proc.stdout:
