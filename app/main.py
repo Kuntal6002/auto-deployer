@@ -5,10 +5,12 @@ from routers.webhooks import router as webhooks_router
 from routers.deployments import router as deployments_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from prometheus_fastapi_instrumentator import Instrumentator
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.connect()
+    Instrumentator().instrument(app).expose(app)
     yield
     await db.disconnect()
 

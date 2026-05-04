@@ -9,6 +9,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "arq>=0.28.0",
     "asyncssh>=2.22.0",
+    "prometheus-fastapi-instrumentator>=7.1.0",
 ]
 
 [build-system]
