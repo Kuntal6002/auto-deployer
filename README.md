@@ -150,4 +150,4 @@ Full writeup coming soon.
 
 ---
 
-Built by [Kuntal](https://github.com/Kuntal6002) · 4th year BTech CSE
+Built by [Kuntal](https://github.com/Kuntal6002) · 3rd year BTech CSE
